@@ -12,7 +12,6 @@ import QuickActionBar from "./components/QuickActionBar";
 import LandingScreen from "./screens/LandingScreen";
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from "./screens/HomeScreen";
-import CheckoutScreen from "./screens/CheckoutScreen";
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -23,7 +22,7 @@ export default function App() {
   const handleStateChange = () => {
     if (navigationRef.isReady()) {
       const options = navigationRef.getCurrentOptions();
-      // Defaults to true unless explicitly set to false in screen options
+      // Only displays when quickAction is explicitly true or undefined
       setShowQuickAction(options?.quickAction !== false);
     }
   };
@@ -44,10 +43,10 @@ export default function App() {
               initialRouteName="Landing"
               screenOptions={{
                 headerShown: false,
-                quickAction: true, // Default: show on all main app screens
+                quickAction: true,
               }}
             >
-              {/* Auth / Onboarding flows (No QuickActionBar) */}
+              {/* Auth / Splash Screens (Hide bottom bar) */}
               <Stack.Screen
                 name="Landing"
                 component={LandingScreen}
@@ -56,15 +55,17 @@ export default function App() {
               <Stack.Screen
                 name="Login"
                 component={LoginScreen}
-                options={{ quickAction: false }}
+                options={{ quickAction: false,statusBarColor: "#eef7ee", // Forces Android native window to paint mint
+    statusBarStyle: "dark",    // Forces dark icons (clock, wifi, battery)
+    statusBarTranslucent: false, }
+
+                }
               />
 
-              {/* Main App flows */}
-              <Stack.Screen name="Home" component={HomeScreen} />
+              {/* Main App Screens (Show bottom bar) */}
               <Stack.Screen
-                name="Checkout"
-                component={CheckoutScreen}
-                options={{ quickAction: false }}
+                name="Home"
+                component={HomeScreen}
               />
             </Stack.Navigator>
           </View>

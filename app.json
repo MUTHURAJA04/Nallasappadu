@@ -9,6 +9,11 @@
     "ios": {
       "supportsTablet": true
     },
+    "androidStatusBar": {
+      "backgroundColor": "#eef7ee",
+      "barStyle": "dark-content",
+      "translucent": false
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
