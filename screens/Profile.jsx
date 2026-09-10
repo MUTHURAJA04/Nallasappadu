@@ -7,6 +7,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert, ActivityIndicator
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,12 +27,12 @@ import {
   LogOut,
   Info,
 } from "lucide-react-native";
-
+import { supabase } from "../lib/supabase";
 import foodData from "../data/foodData.json";
 
-export default function Profile() {
+export default function Profile({ navigation }) {
   const insets = useSafeAreaInsets();
-
+const [loggingOut, setLoggingOut] = useState(false);
   const [profile, setProfile] = useState({
     fullName: "raja",
     email: "kingsai108@gmail.com",
@@ -95,7 +96,46 @@ export default function Profile() {
       setIsUpdating(false);
     }
   };
+const handleSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            console.log("[ProfileScreen.js] Sign Out triggered -> Clearing Supabase session");
+            setLoggingOut(true);
+            try {
+              const { error } = await supabase.auth.signOut();
+              if (error) {
+                console.error("[ProfileScreen.js] supabase.auth.signOut error:", error.message);
+                Alert.alert("Sign Out Error", error.message);
+                setLoggingOut(false);
+                return;
+              }
 
+              console.log("[ProfileScreen.js] Session purged from AsyncStorage -> Resetting navigation to 'Login'");
+              setLoggingOut(false);
+
+              // Reset navigation stack completely to prevent back-button access
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              });
+            } catch (err) {
+              console.error("[ProfileScreen.js] Unexpected sign out error:", err);
+              setLoggingOut(false);
+              Alert.alert("Error", "An unexpected error occurred while signing out.");
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
   const renderDietaryItem = (item) => {
     const isSelected = restrictions.includes(item.id);
 
@@ -519,25 +559,31 @@ export default function Profile() {
             </View>
           </View>
 
-          <View className="p-2 bg-white">
+        <View className="p-2 bg-white">
+      <View className="h-[1px] bg-slate-100 my-3.5" />
 
-            <View className="h-[1px] bg-slate-100 my-3.5" />
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => console.log("Sign Out pressed")}
-              className="h-11 flex-row items-center justify-center rounded-xl border border-red-200 bg-white"
-            >
-              <LogOut size={16} color="#ef4444" strokeWidth={2.2} />
-              <Text className="ml-2 text-sm font-bold text-red-600">
-                Sign Out
-              </Text>
-            </TouchableOpacity>
-
-            <Text className="mt-2 text-center text-[11px] text-slate-400 font-medium">
-              You'll be redirected to the login page
+      <TouchableOpacity
+        activeOpacity={0.8}
+        disabled={loggingOut}
+        onPress={handleSignOut}
+        className="h-11 flex-row items-center justify-center rounded-xl border border-red-200 bg-white"
+      >
+        {loggingOut ? (
+          <ActivityIndicator size="small" color="#ef4444" />
+        ) : (
+          <>
+            <LogOut size={16} color="#ef4444" strokeWidth={2.2} />
+            <Text className="ml-2 text-sm font-bold text-red-600">
+              Sign Out
             </Text>
-          </View>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <Text className="mt-2 text-center text-[11px] text-slate-400 font-medium">
+        You'll be redirected to the login page
+      </Text>
+    </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

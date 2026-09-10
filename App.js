@@ -17,6 +17,7 @@ import Orders from "./screens/Orders";
 import Wallet from "./screens/Wallet";
 import Subs from "./screens/Subs";
 import Profile from "./screens/Profile";
+import CompleteProfileScreen from "./screens/CompleteProfileScreen";
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -71,6 +72,11 @@ export default function App() {
                 name="otp"
                 component={OtpVerificationScreen}
                 options={{ quickAction: false }}
+              />
+              <Stack.Screen
+                name="CompleteProfile"
+                component={CompleteProfileScreen}
+                options={{ headerShown: false, quickAction: false }}
               />
               {/* Main App Screens  */}
               <Stack.Screen name="Home" component={HomeScreen} />

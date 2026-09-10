@@ -11,15 +11,20 @@ import {
   Platform,
   ScrollView,
   useWindowDimensions,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MessageCircle, Check } from "lucide-react-native";
+import { supabase } from "../lib/supabase"; // Adjust path if your file is located elsewhere
 
 const BG_COLOR = "#eef8ef";
 const OTP_LENGTH = 6;
 
 export default function OtpVerificationScreen({ navigation, route }) {
   const phoneNumber = route?.params?.phoneNumber || "+91 ••••••8585";
+  const rawPhone = route?.params?.rawPhone || phoneNumber.replace(/\s+/g, "");
+
   const { width } = useWindowDimensions();
 
   const CARD_PADDING = 24 * 2;
@@ -32,6 +37,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
   const [rememberDevice, setRememberDevice] = useState(false);
   const [timer, setTimer] = useState(30);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const inputRefs = useRef([]);
   const scrollViewRef = useRef(null);
@@ -79,6 +85,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
         if (i < OTP_LENGTH) newOtp[i] = digit;
       });
       setOtp(newOtp);
+      console.log("[OtpVerificationScreen.js] OTP pasted:", newOtp.join(""));
       const nextIndex = Math.min(pasteDigits.length, OTP_LENGTH - 1);
       inputRefs.current[nextIndex]?.focus();
       return;
@@ -87,6 +94,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
     const newOtp = [...otp];
     newOtp[index] = cleaned.slice(-1);
     setOtp(newOtp);
+    console.log(`[OtpVerificationScreen.js] OTP digit [${index}] updated -> ${newOtp[index]}`);
 
     if (cleaned && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
@@ -95,21 +103,119 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
   const handleKeyPress = (event, index) => {
     if (event.nativeEvent.key === "Backspace" && otp[index] === "" && index > 0) {
+      console.log(`[OtpVerificationScreen.js] Backspace pressed at empty index [${index}] -> focusing index [${index - 1}]`);
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handleVerify = () => {
-    if (!isOtpComplete) return;
+const handleVerify = async () => {
+    if (!isOtpComplete || loading) return;
     Keyboard.dismiss();
-    navigation?.replace?.("Home");
+
+    const otpCode = otp.join("");
+    console.log("[OtpVerificationScreen.js] Initiating Verify OTP with:", {
+      phone: rawPhone,
+      token: otpCode,
+      rememberDevice,
+    });
+
+    setLoading(true);
+
+    try {
+      // 1. Submit OTP verification to Supabase
+      console.log("[OtpVerificationScreen.js] [supabase.auth.verifyOtp] -> Sending request...");
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: rawPhone,
+        token: otpCode,
+        type: "sms",
+      });
+
+      if (error) {
+        console.error("[OtpVerificationScreen.js] [supabase.auth.verifyOtp] Verification failed:", {
+          message: error.message,
+          status: error.status,
+        });
+        Alert.alert("Invalid Code", error.message || "Failed to verify OTP.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("[OtpVerificationScreen.js] [supabase.auth.verifyOtp] Verified successfully:", {
+        userId: data?.user?.id,
+        phone: data?.user?.phone,
+        hasSession: !!data?.session,
+      });
+
+      const userId = data?.user?.id;
+      // Get the phone as stored in auth.users or fallback to rawPhone
+      const authPhone = data?.user?.phone || rawPhone;
+
+      // 2. Query public.users checking both ID and Phone
+      console.log("[OtpVerificationScreen.js] [public.users query] -> Checking for uid:", userId, "or phone:", authPhone);
+      
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("id, name, email, phone")
+        .or(`id.eq.${userId},phone.eq.${authPhone}`)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn("[OtpVerificationScreen.js] [public.users query] Warning:", profileError.message);
+      }
+
+      console.log("[OtpVerificationScreen.js] [public.users query] Profile result:", profile);
+
+      setLoading(false);
+
+      // 3. Conditional routing based on profile completeness
+      if (profile && profile.name) {
+        console.log("[OtpVerificationScreen.js] Existing profile detected -> Routing to Home");
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Home" }],
+        });
+      } else {
+        console.log("[OtpVerificationScreen.js] Profile missing or incomplete -> Routing to CompleteProfile");
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "CompleteProfile",
+              params: { phone: authPhone, userId },
+            },
+          ],
+        });
+      }
+    } catch (err) {
+      console.error("[OtpVerificationScreen.js] Unexpected error during verification:", err);
+      Alert.alert("Verification Error", err.message || "An unexpected error occurred.");
+      setLoading(false);
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (timer > 0) return;
-    setTimer(30);
-    setOtp(Array(OTP_LENGTH).fill(""));
-    inputRefs.current[0]?.focus();
+    console.log("[OtpVerificationScreen.js] Resend OTP clicked for:", rawPhone);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        phone: rawPhone,
+      });
+
+      if (error) {
+        console.error("[OtpVerificationScreen.js] [supabase.auth.signInWithOtp Resend] Error:", error.message);
+        Alert.alert("Resend Failed", error.message);
+        return;
+      }
+
+      console.log("[OtpVerificationScreen.js] [supabase.auth.signInWithOtp Resend] OTP resent successfully:", data);
+      setTimer(30);
+      setOtp(Array(OTP_LENGTH).fill(""));
+      inputRefs.current[0]?.focus();
+      Alert.alert("Code Sent", "A fresh verification code has been dispatched.");
+    } catch (err) {
+      console.error("[OtpVerificationScreen.js] Resend unexpected error:", err);
+    }
   };
 
   return (
@@ -211,15 +317,19 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  disabled={!isOtpComplete}
+                  disabled={!isOtpComplete || loading}
                   onPress={handleVerify}
                   className={`w-full h-12 rounded-xl mt-6 items-center justify-center ${
-                    isOtpComplete ? "bg-green-700" : "bg-[#7db89e]"
+                    isOtpComplete && !loading ? "bg-green-700" : "bg-[#7db89e]"
                   }`}
                 >
-                  <Text className="text-white text-sm font-extrabold tracking-wide">
-                    Verify Phone Number
-                  </Text>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text className="text-white text-sm font-extrabold tracking-wide">
+                      Verify Phone Number
+                    </Text>
+                  )}
                 </TouchableOpacity>
 
                 <View className="flex-row justify-center items-center mt-6">

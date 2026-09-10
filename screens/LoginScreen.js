@@ -12,10 +12,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Search } from "lucide-react-native";
 import COUNTRY_CODES from "../data/countryCodes.json";
+import { supabase } from "../lib/supabase"; // Adjust path to your supabase.js if needed
 
 const BG_COLOR = "#eef7ee";
 
@@ -26,6 +29,7 @@ export default function LoginScreen({ navigation }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const filteredCountries = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -38,17 +42,75 @@ export default function LoginScreen({ navigation }) {
     );
   }, [searchQuery]);
 
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     const cleanedNumber = phoneNumber.replace(/[^0-9]/g, "");
-    if (!cleanedNumber || cleanedNumber.length < (selectedCountry.digits || 7)) {
+    const requiredDigits = selectedCountry.digits || 7;
+
+    console.log("[LoginScreen.js] Attempting Send OTP with:", {
+      country: selectedCountry.name,
+      dialCode: selectedCountry.dialCode,
+      rawInput: phoneNumber,
+      cleanedDigits: cleanedNumber,
+      digitsLength: cleanedNumber.length,
+      requiredDigits,
+    });
+
+    if (!cleanedNumber || cleanedNumber.length < requiredDigits) {
+      console.warn(
+        `[LoginScreen.js] Validation failed: Phone number length (${cleanedNumber.length}) is less than required (${requiredDigits})`
+      );
+      Alert.alert(
+        "Invalid Number",
+        `Please enter a valid ${requiredDigits}-digit mobile number.`
+      );
       return;
     }
+
     Keyboard.dismiss();
-    const formattedPhone = `${selectedCountry.dialCode} ${cleanedNumber}`;
-    navigation.navigate("otp", { phoneNumber: formattedPhone });
+
+    // Standard E.164 phone format for Supabase (e.g. "+916382982621")
+    const e164Phone = `${selectedCountry.dialCode}${cleanedNumber}`;
+    // Display-friendly format for the next screen (e.g. "+91 6382982621")
+    const displayPhone = `${selectedCountry.dialCode} ${cleanedNumber}`;
+
+    setLoading(true);
+    console.log("[LoginScreen.js] [supabase.auth.signInWithOtp] -> Dispatching request for:", e164Phone);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        phone: e164Phone,
+      });
+
+      if (error) {
+        console.error("[LoginScreen.js] [supabase.auth.signInWithOtp] Error received:", {
+          message: error.message,
+          status: error.status,
+        });
+        Alert.alert("Error Sending OTP", error.message);
+        setLoading(false);
+        return;
+      }
+
+      console.log("[LoginScreen.js] [supabase.auth.signInWithOtp] Success response:", data);
+      console.log("[LoginScreen.js] Navigating to 'otp' screen with params:", {
+        phoneNumber: displayPhone,
+        rawPhone: e164Phone,
+      });
+
+      setLoading(false);
+      navigation.navigate("otp", {
+        phoneNumber: displayPhone,
+        rawPhone: e164Phone,
+      });
+    } catch (err) {
+      console.error("[LoginScreen.js] Unexpected error during OTP trigger:", err);
+      Alert.alert("Unexpected Error", err.message || "Something went wrong.");
+      setLoading(false);
+    }
   };
 
   const closeModal = () => {
+    console.log("[LoginScreen.js] Closing Country Picker modal");
     setModalVisible(false);
     setSearchQuery("");
   };
@@ -101,6 +163,7 @@ export default function LoginScreen({ navigation }) {
                   <View className="flex-row items-center gap-3">
                     <TouchableOpacity
                       onPress={() => {
+                        console.log("[LoginScreen.js] Opening Country Picker modal");
                         Keyboard.dismiss();
                         setModalVisible(true);
                       }}
@@ -124,7 +187,10 @@ export default function LoginScreen({ navigation }) {
                       keyboardType="phone-pad"
                       maxLength={selectedCountry.digits || 15}
                       value={phoneNumber}
-                      onChangeText={(val) => setPhoneNumber(val.replace(/[^0-9]/g, ""))}
+                      onChangeText={(val) => {
+                        const cleaned = val.replace(/[^0-9]/g, "");
+                        setPhoneNumber(cleaned);
+                      }}
                       style={{
                         paddingTop: 0,
                         paddingBottom: 0,
@@ -142,12 +208,17 @@ export default function LoginScreen({ navigation }) {
 
                 <TouchableOpacity
                   onPress={handleSendCode}
+                  disabled={loading}
                   activeOpacity={0.85}
                   className="w-full bg-[#803816] h-12 rounded-xl items-center justify-center shadow-md shadow-amber-950/20 active:bg-[#682c10]"
                 >
-                  <Text className="text-white font-bold text-base tracking-wide">
-                    Send Verification Code
-                  </Text>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text className="text-white font-bold text-base tracking-wide">
+                      Send Verification Code
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -196,6 +267,7 @@ export default function LoginScreen({ navigation }) {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   onPress={() => {
+                    console.log("[LoginScreen.js] Country selected:", item);
                     setSelectedCountry(item);
                     closeModal();
                   }}

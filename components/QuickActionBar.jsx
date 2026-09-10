@@ -1,21 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Home, Package, Wallet, Repeat, User } from "lucide-react-native";
-import { navigationRef } from "../App"; // Adjust path to your App file
 
 export default function QuickActionBar() {
   const insets = useSafeAreaInsets();
-  const [currentRouteName, setCurrentRouteName] = useState("Home");
+  const navigation = useNavigation();
 
-  useEffect(() => {
-    if (navigationRef.isReady()) {
-      const activeScreen = navigationRef.getCurrentRoute()?.name;
-      if (activeScreen) {
-        setCurrentRouteName(activeScreen);
-      }
-    }
-  }, []);
+  const [currentRouteName, setCurrentRouteName] = useState("Home");
 
   const tabs = [
     { name: "Home", label: "Home", icon: Home },
@@ -25,13 +18,37 @@ export default function QuickActionBar() {
     { name: "Profile", label: "Profile", icon: User },
   ];
 
-  const handleTabPress = (tabName) => {
-    console.log(`${tabName} icon tapped`);
-    setCurrentRouteName(tabName);
+  useFocusEffect(
+    useCallback(() => {
+      const parent = navigation.getParent();
 
-    if (navigationRef.isReady()) {
-      navigationRef.navigate(tabName);
+      const updateActiveRoute = () => {
+        const route = parent?.getState()?.routes?.find(
+          (route) => route.key === parent?.getState()?.key
+        );
+
+        const currentRoute = parent?.getCurrentRoute?.();
+
+        if (currentRoute?.name) {
+          setCurrentRouteName(currentRoute.name);
+        }
+      };
+
+      updateActiveRoute();
+
+      const unsubscribe = navigation.addListener("state", updateActiveRoute);
+
+      return unsubscribe;
+    }, [navigation])
+  );
+
+  const handleTabPress = (tabName) => {
+    if (currentRouteName === tabName) {
+      return;
     }
+
+    setCurrentRouteName(tabName);
+    navigation.navigate(tabName);
   };
 
   return (
@@ -55,6 +72,7 @@ export default function QuickActionBar() {
               color={isActive ? "#059669" : "#6b7280"}
               strokeWidth={isActive ? 2.5 : 2}
             />
+
             <Text
               numberOfLines={1}
               className={`text-xs mt-1 ${
@@ -71,3 +89,4 @@ export default function QuickActionBar() {
     </View>
   );
 }
+
