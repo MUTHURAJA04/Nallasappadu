@@ -13,6 +13,10 @@ import LandingScreen from "./screens/LandingScreen";
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from "./screens/HomeScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
+import Orders from "./screens/Orders";
+import Wallet from "./screens/Wallet";
+import Subs from "./screens/Subs";
+import Profile from "./screens/Profile";
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -63,13 +67,17 @@ export default function App() {
                   statusBarTranslucent: false,
                 }}
               />
-       <Stack.Screen
+              <Stack.Screen
                 name="otp"
                 component={OtpVerificationScreen}
                 options={{ quickAction: false }}
               />
-              {/* Main App Screens (Show bottom bar) */}
+              {/* Main App Screens  */}
               <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="Orders" component={Orders} />
+              <Stack.Screen name="Wallet" component={Wallet} />
+              <Stack.Screen name="Subs" component={Subs} />
+              <Stack.Screen name="Profile" component={Profile} />
             </Stack.Navigator>
           </View>
 
