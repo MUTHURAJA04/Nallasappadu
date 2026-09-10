@@ -5,7 +5,7 @@ export default function QuickActionBar() {
   const navigation = useNavigation();
 
   return (
-    <View className="flex-row items-center justify-around bg-slate-900 border-t border-slate-800 py-3 px-4">
+    <View className="flex-row items-center justify-around bg-slate-900 border-t border-slate-800 py-11 px-4">
       <TouchableOpacity 
         className="items-center" 
         onPress={() => navigation.navigate("Home")}

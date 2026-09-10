@@ -12,6 +12,7 @@ import QuickActionBar from "./components/QuickActionBar";
 import LandingScreen from "./screens/LandingScreen";
 import LoginScreen from "./screens/LoginScreen";
 import HomeScreen from "./screens/HomeScreen";
+import OtpVerificationScreen from "./screens/OtpVerificationScreen";
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -55,18 +56,20 @@ export default function App() {
               <Stack.Screen
                 name="Login"
                 component={LoginScreen}
-                options={{ quickAction: false,statusBarColor: "#eef7ee", // Forces Android native window to paint mint
-    statusBarStyle: "dark",    // Forces dark icons (clock, wifi, battery)
-    statusBarTranslucent: false, }
-
-                }
+                options={{
+                  quickAction: false,
+                  statusBarColor: "#eef7ee", // Forces Android native window to paint mint
+                  statusBarStyle: "dark", // Forces dark icons (clock, wifi, battery)
+                  statusBarTranslucent: false,
+                }}
               />
-
+       <Stack.Screen
+                name="otp"
+                component={OtpVerificationScreen}
+                options={{ quickAction: false }}
+              />
               {/* Main App Screens (Show bottom bar) */}
-              <Stack.Screen
-                name="Home"
-                component={HomeScreen}
-              />
+              <Stack.Screen name="Home" component={HomeScreen} />
             </Stack.Navigator>
           </View>
 

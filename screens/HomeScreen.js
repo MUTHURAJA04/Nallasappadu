@@ -10,7 +10,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center bg-slate-950 px-4">
+    <View className="flex-1 items-center justify-center bg-red-950 px-4">
       <Text className="text-3xl font-extrabold text-white mb-2">
         Home Screen
       </Text>
