@@ -45,7 +45,7 @@ export default function LandingScreen({ navigation }) {
 
     // Navigate after animation
     const navTimer = setTimeout(() => {
-      navigation.replace("Home");
+      navigation.replace("Login");
     }, 2000);
 
     return () => {
