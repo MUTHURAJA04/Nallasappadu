@@ -68,7 +68,7 @@ export default function HomeScreen() {
         {/* QUICK ORDERS */}
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => navigation.navigate("Orders")}
+          onPress={() => navigation.navigate("QuickOrdersScreen")}
           style={{
             width: "100%",
             height: 79,

@@ -18,6 +18,7 @@ import Wallet from "./screens/Wallet";
 import Subs from "./screens/Subs";
 import Profile from "./screens/Profile";
 import CompleteProfileScreen from "./screens/CompleteProfileScreen";
+import QuickOrdersScreen from "./screens/QuickOrdersScreen";
 
 const Stack = createNativeStackNavigator();
 export const navigationRef = createNavigationContainerRef();
@@ -76,6 +77,12 @@ export default function App() {
               <Stack.Screen
                 name="CompleteProfile"
                 component={CompleteProfileScreen}
+                options={{ headerShown: false, quickAction: false }}
+              />
+
+              <Stack.Screen
+                name="QuickOrdersScreen"
+                component={QuickOrdersScreen}
                 options={{ headerShown: false, quickAction: false }}
               />
               {/* Main App Screens  */}

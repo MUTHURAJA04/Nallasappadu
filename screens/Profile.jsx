@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState , useEffect} from "react";
 import {
   View,
   Text,
@@ -29,14 +29,18 @@ import {
 } from "lucide-react-native";
 import { supabase } from "../lib/supabase";
 import foodData from "../data/foodData.json";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function Profile({ navigation }) {
   const insets = useSafeAreaInsets();
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [primaryAddress, setPrimaryAddress] = useState(null);
 const [loggingOut, setLoggingOut] = useState(false);
   const [profile, setProfile] = useState({
-    fullName: "raja",
-    email: "kingsai108@gmail.com",
-    phone: "+916382982621",
+    fullName: "",
+    email: "",
+    phone: "",
   });
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -44,8 +48,61 @@ const [loggingOut, setLoggingOut] = useState(false);
     fullName: "",
     email: "",
   });
+  useFocusEffect(
+  React.useCallback(() => {
+    fetchUserData();
+  }, [])
+);
+   const fetchUserData = async () => {
+      try {
+        console.log("[Profile.js] Fetching user session...");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  const [restrictions, setRestrictions] = useState(["b1", "b3"]);
+        if (sessionError || !session?.user) {
+          console.warn("[Profile.js] No active session found.");
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+          return;
+        }
+
+        const uid = session.user.id;
+        const authPhone = session.user.phone;
+        setCurrentUserId(uid);
+
+        console.log("[Profile.js] Querying public.users for uid:", uid);
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("id, name, email, phone, addresses(*)")
+          .or(`id.eq.${uid},phone.eq.${authPhone}`)
+          .maybeSingle();
+
+        if (userError) {
+          console.error("[Profile.js] Error loading profile:", userError.message);
+          return;
+        }
+
+        if (userData) {
+          console.log("[Profile.js] Profile loaded:", userData);
+          setProfile({
+            fullName: userData.name || "",
+            email: userData.email || "",
+            phone: userData.phone || authPhone || "",
+          });
+
+          if (userData.addresses && userData.addresses.length > 0) {
+            const def = userData.addresses.find((a) => a.is_default) || userData.addresses[0];
+            setPrimaryAddress(def);
+          }
+        }
+      } catch (err) {
+        console.error("[Profile.js] Unexpected error fetching user:", err);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+useEffect(() => {
+    fetchUserData();
+  }, [navigation]);
+  const [restrictions, setRestrictions] = useState([]);
 
   const updateField = (field, value) => {
     setProfile((prev) => ({
@@ -84,14 +141,48 @@ const [loggingOut, setLoggingOut] = useState(false);
     return !newErrors.fullName && !newErrors.email;
   };
 
-  const handleUpdateProfile = async () => {
+const handleUpdateProfile = async () => {
     if (!validateProfile()) return;
 
     try {
       setIsUpdating(true);
-      console.log("Profile update:", profile);
+      console.log("[Profile.js] Updating profile in Supabase for uid:", currentUserId);
+
+      // Filter directly by currentUserId
+      const { data, error } = await supabase
+        .from("users")
+        .update({
+          name: profile.fullName.trim(),
+          email: profile.email.trim(),
+        })
+        .eq("id", currentUserId)
+        .select();
+
+      if (error) {
+        console.error("[Profile.js] Update failed:", error.message);
+        Alert.alert("Update Error", error.message);
+        return;
+      }
+
+      console.log("[Profile.js] Profile update response:", data);
+
+      if (!data || data.length === 0) {
+        console.warn("[Profile.js] 0 rows updated. Check RLS UPDATE policy on public.users.");
+        Alert.alert("Notice", "Update could not be applied. Please check permissions.");
+        return;
+      }
+
+      // Update local state with the returned data
+      setProfile((prev) => ({
+        ...prev,
+        fullName: data[0].name,
+        email: data[0].email,
+      }));
+
+      Alert.alert("Success", "Profile details updated successfully!");
     } catch (error) {
-      console.log("Profile update error:", error);
+      console.error("[Profile.js] Unexpected update error:", error);
+      Alert.alert("Error", "Could not update profile.");
     } finally {
       setIsUpdating(false);
     }
@@ -358,9 +449,10 @@ const handleSignOut = () => {
                   <View className="w-8 h-8 rounded-full bg-emerald-100 items-center justify-center mr-2.5">
                     <Home size={16} color="#059669" strokeWidth={2.2} />
                   </View>
-                  <Text className="text-base font-bold text-slate-800">
-                    Home
-                  </Text>
+                 {/* Replace the hardcoded Address Title */}
+              <Text className="text-base font-bold text-slate-800">
+                {primaryAddress?.label || "Home"}
+              </Text>
                 </View>
 
                 <View className="flex-row items-center gap-3">
@@ -380,15 +472,25 @@ const handleSignOut = () => {
                 </View>
               </View>
 
+             {/* Dynamic Line 1: Building / Street / Locality */}
               <Text className="text-xs text-slate-700 leading-4">
-                KB Dasan Road, Lubdhi Colony, Deputy High Commission of
-                Bangladesh Chennai
+                {primaryAddress
+                  ? [primaryAddress.building, primaryAddress.street, primaryAddress.locality]
+                      .filter(Boolean)
+                      .join(", ")
+                  : "No delivery address added yet"}
               </Text>
-              <Text className="text-xs text-slate-500 mt-1">
-                Alwarpet, Tamil Nadu - 600018
-              </Text>
+
+              {/* Dynamic Line 2: Area / City */}
+              {primaryAddress?.area ? (
+                <Text className="text-xs text-slate-500 mt-1">
+                  {primaryAddress.area}
+                </Text>
+              ) : null}
+
+              {/* Dynamic Phone Number */}
               <Text className="text-xs text-slate-600 mt-1">
-                📞 +916382982621
+                📞 {profile.phone || "No phone added"}
               </Text>
 
               <View className="h-[1px] bg-slate-100 my-3" />
